@@ -30,6 +30,7 @@
  * 
  */
 
+#include <stdint.h>
 #include <pcap.h>		// for libpcap/WinPcap calls
 #include <errno.h>		// for the errno variable
 #include <stdlib.h>		// for malloc(), free(), ...
@@ -48,6 +49,16 @@
 #include <sys/uio.h>
 #include <pwd.h>		// for password management
 #include <syslog.h>
+
+
+/* Portable memory barriers for multi-threaded use. */
+#ifndef rmb
+#define rmb() __sync_synchronize()
+#endif
+
+#ifndef wmb
+#define wmb() __sync_synchronize()
+#endif
 
 int
 set_non_blocking(int fd)
@@ -1750,11 +1761,46 @@ error:
 	return -1;
 }
 
+/*#define RPCAP_NETBUF_MAX_SIZE   65536
+#define DAEMON_USE_COND_TIMEDWAIT   0
+
+//#define rmb()   asm volatile("lfence":::"memory")
+//#define wmb()   asm volatile("sfence":::"memory")
+
+#if defined(__x86_64__) || defined(__i386__)
+    __asm__ __volatile__("sfence" ::: "memory");
+//#elif defined(__aarch64__)
+ On ARM64, use a data memory barrier instead of sfence
+    __asm__ __volatile__("dmb ish" ::: "memory");
+#else
+    __sync_synchronize();
+#endif
+#if defined(__x86_64__) || defined(__i386__)
+    __asm__ __volatile__("lfence" ::: "memory");
+#elif defined(__aarch64__)
+// On ARM64, use a load barrier instead of lfence
+    __asm__ __volatile__("dmb ishld" ::: "memory");
+#else
+    __sync_synchronize();
+#endif
+*/
+
 #define RPCAP_NETBUF_MAX_SIZE   65536
 #define DAEMON_USE_COND_TIMEDWAIT   0
 
-#define rmb()   asm volatile("lfence":::"memory")
-#define wmb()   asm volatile("sfence":::"memory")
+/* Portable memory barriers for all architectures (ARM, x86, etc.) */
+#ifndef rmb
+#define rmb() __sync_synchronize()
+#endif
+
+#ifndef wmb
+#define wmb() __sync_synchronize()
+#endif
+
+
+
+
+
 
 #define likely(x)   __builtin_expect((x), 1)
 #define unlikely(x) __builtin_expect((x), 0)
@@ -1830,6 +1876,7 @@ static struct daemon_ring_ctx daemon_ring_ctx;
 #include <sched.h>
 #include <syscall.h>
 #include <sys/resource.h>
+#include <stdint.h>
 #define gettid() syscall(__NR_gettid)
 
 void

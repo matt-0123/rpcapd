@@ -14,7 +14,7 @@ WINCFLAGS   = -DHAVE_STRUCT_TIMESPEC
 INCLUDE	= -I../
 WININCLUDE = -I../Win32/Include -I../../../Common -I../../../../win32-pthreads
 
-LINUXLIB = -lpcap -lcrypt -static
+LINUXLIB = -lpcap -lcrypt
 OSXLIB   = -lpcap
 WINLIB   = -lwpcap -lpthreadGC2 -lpacket -lws2_32
 

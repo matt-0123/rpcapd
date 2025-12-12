@@ -57,7 +57,8 @@ extern struct activehosts *activeHosts;
 
 	See the documentation of pcap_remoteact_accept() and pcap_remoteact_cleanup() for more details.
 */
-SOCKET sockmain;
+//SOCKET sockmain;
+extern SOCKET sockmain;
 
 
 //! String identifier to be used in the pcap_findalldevs_ex()

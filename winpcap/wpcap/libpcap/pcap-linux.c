@@ -91,6 +91,7 @@ static const char rcsid[] _U_ =
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/ioctl.h>
+#include <linux/sockios.h>
 #include <sys/utsname.h>
 #include <sys/mman.h>
 #include <net/if.h>
