@@ -1,53 +1,145 @@
-# ARM64 / Graviton Build Instructions for rpcapd
+# ARM64 / AWS Graviton Build Instructions for ExtraHop rpcapd
 
-This fork includes the changes required to build the ExtraHop rpcapd agent on ARM64 platforms such as:
+This repository is a fork of ExtraHop’s `rpcapd` agent with additional patches required to successfully build and run it on **ARM64-based Linux systems**, including:
 
-- AWS Graviton (Amazon Linux 2 / 2023)
-- Other modern ARM64 Linux distributions
+- AWS Graviton (Amazon Linux 2 / Amazon Linux 2023)
+- Ubuntu ARM64
+- Debian ARM64
+- Other AArch64 Linux distributions
 
-## Changes in this fork (high level)
+The original upstream project was based on very old WinPcap/libpcap code (circa ~2003), which does not compile on modern ARM systems without significant patching. This fork includes all fixes required to produce a functional, stable ARM64 `rpcapd` binary compatible with ExtraHop sensors.
 
-- Enabled remote capture support in libpcap (HAVE_REMOTE).
-- Patched old libpcap sources for modern Linux headers (e.g. SIOCGSTAMP requires <linux/sockios.h>).
-- Removed x86-only inline assembly (sfence / lfence) and replaced with portable memory barriers.
-- Fixed missing includes for types like UINT16_MAX.
-- Resolved multiple-definition of `sockmain` between rpcapd.c and pcap-new.c.
-- Switched from static linking (-static) to dynamic linking to avoid missing -lc / -lcrypt issues.
-- Ensured rpcapd links against libpcap and libcrypt on Amazon Linux.
+## ✔ Summary of Changes in This Fork
 
-## Build Steps (Amazon Linux / Graviton)
+### libpcap fixes
+- Added missing Linux header: `#include <linux/sockios.h>` for `SIOCGSTAMP`
+- Enabled remote capture support (`HAVE_REMOTE`)
+- Updated Makefile to ensure bundled libpcap is used
+- Added `<stdint.h>` for `UINT16_MAX`
+- Removed static linking (`-static`) to avoid glibc issues on ARM
+- Fixed configuration script compatibility for AArch64 (`--build=aarch64-unknown-linux-gnu`)
 
-```bash
+### rpcapd code fixes
+- Removed x86-specific inline ASM (`sfence`, `lfence`)
+- Replaced memory barriers with portable `__sync_synchronize()`
+- Resolved multiple-definition error for `sockmain`
+- Ensured rpcapd links against ARM-compatible libpcap and libcrypt
+
+## ✔ Prerequisites
+
+### Amazon Linux 2
+```
 sudo yum groupinstall -y "Development Tools"
-sudo yum install -y libpcap libpcap-devel libxcrypt libxcrypt-devel flex bison
+sudo yum install -y libpcap libpcap-devel libxcrypt libxcrypt-devel flex bison git
+```
 
+### Amazon Linux 2023
+```
+sudo dnf groupinstall -y "Development Tools"
+sudo dnf install -y libpcap libpcap-devel libxcrypt libxcrypt-devel flex bison git
+```
+
+### Ubuntu (ARM64)
+```
+sudo apt update
+sudo apt install -y build-essential libpcap-dev libxcrypt-dev flex bison git autoconf automake libtool
+```
+
+## ✔ Clone This Fork
+
+```
 cd /opt
-sudo git clone https://github.com/matt-0123/rpcapd.git
-sudo chown -R "$USER":"$USER" rpcapd
-cd rpcapd/winpcap/wpcap/libpcap
+git clone https://github.com/0xM47H3W/rpcapd.git
+cd rpcapd
+```
 
-# Enable remote capture support
+## ✔ Build the Bundled libpcap
+
+```
+cd winpcap/wpcap/libpcap
 ./configure --build=aarch64-unknown-linux-gnu --enable-remote
 make
+```
 
-# Build rpcapd
+## ✔ Build rpcapd
+
+```
 cd rpcapd
 make clean || true
-make
-The resulting binary will be:
+make CFLAGS="-g -O2 -Wno-error -DHAVE_REMOTE -I../"
+```
 
-bash
-Copy code
+Output binary:
+
+```
 winpcap/wpcap/libpcap/rpcapd/rpcapd
-Install it with:
+```
 
-bash
-Copy code
+## ✔ Install rpcapd
+
+```
 sudo cp rpcapd /usr/local/sbin/rpcapd
 sudo chmod 755 /usr/local/sbin/rpcapd
 sudo chown root:root /usr/local/sbin/rpcapd
-Run in active mode:
+```
 
-bash
-Copy code
+## ✔ Test rpcapd
+
+Foreground:
+```
+sudo /usr/local/sbin/rpcapd -n -v
+```
+
+Passive:
+```
+sudo /usr/local/sbin/rpcapd -n -v -p 2002
+```
+
+Active with local listener:
+```
+nc -l 2003
+sudo /usr/local/sbin/rpcapd -n -v -a 127.0.0.1,2003
+```
+
+## ✔ Run Against an ExtraHop Sensor
+
+Active:
+```
 sudo /usr/local/sbin/rpcapd -n -v -a <sensor-ip>,2003
+```
+
+Passive:
+```
+sudo /usr/local/sbin/rpcapd -n -v -p 2002
+```
+
+## ✔ systemd Service
+
+Create `/etc/systemd/system/rpcapd.service`:
+```
+[Unit]
+Description=ExtraHop rpcapd ARM64 Agent
+After=network-online.target
+
+[Service]
+ExecStart=/usr/local/sbin/rpcapd -a <sensor-ip>,2003 -n
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Enable:
+```
+sudo systemctl daemon-reload
+sudo systemctl enable rpcapd
+sudo systemctl start rpcapd
+```
+
+## ✔ Notes
+
+- This fork is **not** an official ExtraHop release.
+- ARM64 patches included for compatibility.
+- Precompiled binaries may be included in GitHub Releases.
+
